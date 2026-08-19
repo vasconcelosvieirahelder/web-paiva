@@ -1,8 +1,35 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #eef5f1;
+  --foreground: #0f172a;
+  --paiva-deep: #102f2b;
+  --paiva-night: #0b221f;
+  --paiva-teal: #04776f;
+  --paiva-lagoon: #4ab4ad;
+  --paiva-reef: #c98240;
+  --paiva-sand: #d9bd83;
+  --paiva-mist: #dfeee8;
+  color-scheme: light;
+}
+
+:root[data-theme="light"] {
+  --background: #eef5f1;
+  --foreground: #0f172a;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --background: #071816;
+  --foreground: #e7f2ed;
+  --paiva-deep: #071816;
+  --paiva-night: #04110f;
+  --paiva-teal: #39a79d;
+  --paiva-lagoon: #67c8bd;
+  --paiva-reef: #d19a62;
+  --paiva-sand: #d8c395;
+  --paiva-mist: #122a27;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -12,15 +39,175 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+:root[data-theme="light"] body {
+  background: #eef5f1;
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .paiva-page {
+  background:
+    radial-gradient(circle at 88% 6%, rgba(74, 180, 173, 0.12), transparent 32%),
+    linear-gradient(180deg, #e8f2ee 0%, #f5f7f2 46%, #e9f1ef 100%) !important;
+}
+
+:root[data-theme="light"] .theme-choice-light {
+  background-color: #fef3c7 !important;
+  color: #b45309 !important;
+}
+
+:root[data-theme="light"] .theme-choice-dark {
+  background-color: transparent !important;
+  color: #64748b !important;
+}
+
+:root[data-theme="dark"] .theme-choice-dark {
+  background-color: #134e4a !important;
+  color: #ccfbf1 !important;
+}
+
+:root[data-theme="dark"] .theme-choice-light {
+  background-color: transparent !important;
+  color: #94a3b8 !important;
+}
+
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(57, 167, 157, 0.16), transparent 30%),
+    linear-gradient(180deg, #071816 0%, #0b2421 48%, #081a18 100%);
+  color: var(--foreground);
+}
+
+:root[data-theme="dark"] .paiva-page,
+:root[data-theme="dark"] .bg-slate-50,
+:root[data-theme="dark"] .bg-\[\#edf4f1\] {
+  background:
+    radial-gradient(circle at 88% 4%, rgba(74, 180, 173, 0.16), transparent 30%),
+    linear-gradient(180deg, #071816 0%, #0d2724 48%, #081b18 100%) !important;
+}
+
+:root[data-theme="dark"] header,
+:root[data-theme="dark"] .bg-white\/92 {
+  background-color: rgba(7, 24, 22, 0.92) !important;
+  border-color: rgba(125, 211, 202, 0.18) !important;
+}
+
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] .bg-\[\#f8f5eb\],
+:root[data-theme="dark"] .bg-slate-50 {
+  background-color: #102724 !important;
+}
+
+:root[data-theme="dark"] .bg-teal-50 {
+  background-color: #0d312d !important;
+}
+
+:root[data-theme="dark"] .bg-amber-50 {
+  background-color: #352716 !important;
+}
+
+:root[data-theme="dark"] .bg-slate-100 {
+  background-color: #183632 !important;
+}
+
+:root[data-theme="dark"] .border-slate-200,
+:root[data-theme="dark"] .border-slate-300,
+:root[data-theme="dark"] .border-teal-900\/10,
+:root[data-theme="dark"] .border-teal-900\/15,
+:root[data-theme="dark"] .border-amber-200 {
+  border-color: rgba(150, 190, 183, 0.22) !important;
+}
+
+:root[data-theme="dark"] .ring-slate-200,
+:root[data-theme="dark"] .ring-teal-900\/15,
+:root[data-theme="dark"] .ring-black\/10 {
+  --tw-ring-color: rgba(150, 190, 183, 0.22) !important;
+}
+
+:root[data-theme="dark"] .text-slate-950,
+:root[data-theme="dark"] .text-slate-900,
+:root[data-theme="dark"] .text-teal-950,
+:root[data-theme="dark"] .text-amber-950 {
+  color: #eff8f4 !important;
+}
+
+:root[data-theme="dark"] .text-slate-800,
+:root[data-theme="dark"] .text-slate-700,
+:root[data-theme="dark"] .text-slate-600,
+:root[data-theme="dark"] .text-teal-900,
+:root[data-theme="dark"] .text-amber-900 {
+  color: #c9ddd7 !important;
+}
+
+:root[data-theme="dark"] .text-teal-700,
+:root[data-theme="dark"] .text-teal-800 {
+  color: #7dd8ce !important;
+}
+
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] select {
+  background-color: #0a1e1b !important;
+  border-color: rgba(150, 190, 183, 0.32) !important;
+  color: #eff8f4 !important;
+}
+
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder {
+  color: #8fb0aa !important;
+}
+
+:root[data-theme="dark"] a:hover,
+:root[data-theme="dark"] button:hover {
+  text-decoration-color: currentColor;
+}
+
+.paiva-page {
+  background:
+    radial-gradient(circle at 88% 6%, rgba(74, 180, 173, 0.12), transparent 32%),
+    linear-gradient(180deg, #e8f2ee 0%, #f5f7f2 46%, #e9f1ef 100%);
+}
+
+.paiva-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(8, 31, 29, 0.9) 0%, rgba(10, 51, 47, 0.72) 48%, rgba(11, 34, 31, 0.56) 100%),
+    linear-gradient(180deg, rgba(6, 24, 22, 0.18) 0%, rgba(6, 24, 22, 0.62) 100%),
+    url("/images/paiva-hero-reference.png");
+  background-position: center;
+  background-size: cover;
+}
+
+.paiva-hero::before {
+  background:
+    linear-gradient(100deg, transparent 0 13%, rgba(29, 86, 71, 0.34) 13% 18%, transparent 18% 31%, rgba(217, 189, 131, 0.2) 31% 36%, transparent 36%),
+    radial-gradient(ellipse at 78% 30%, rgba(74, 180, 173, 0.22), transparent 32%),
+    linear-gradient(175deg, transparent 0 54%, rgba(217, 189, 131, 0.18) 54% 62%, rgba(6, 75, 88, 0.28) 62% 76%, rgba(6, 45, 52, 0.64) 76% 100%);
+  content: "";
+  inset: 0;
+  mix-blend-mode: soft-light;
+  opacity: 0.86;
+  position: absolute;
+}
+
+.paiva-hero::after {
+  background:
+    radial-gradient(ellipse at 72% 78%, rgba(201, 130, 64, 0.2) 0 8%, transparent 9%),
+    radial-gradient(ellipse at 84% 80%, rgba(201, 130, 64, 0.16) 0 6%, transparent 7%),
+    linear-gradient(180deg, rgba(4, 18, 17, 0.08) 0%, rgba(4, 18, 17, 0.52) 100%);
+  content: "";
+  inset: 0;
+  position: absolute;
+}
+
+.paiva-mark {
+  background:
+    radial-gradient(circle at 36% 34%, #f3dfbd 0 13%, transparent 14%),
+    conic-gradient(from 205deg, #04776f, #54b8ad, #d88b45, #04776f);
 }
