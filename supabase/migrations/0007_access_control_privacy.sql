@@ -1,3 +1,25 @@
+create schema if not exists private;
+
+create or replace function private.listing_has_submitted_event(target_listing_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.moderation_events
+    where moderation_events.listing_id = target_listing_id
+    and moderation_events.action = 'submitted'
+  );
+$$;
+
+revoke all on function private.listing_has_submitted_event(uuid) from public;
+revoke execute on function private.listing_has_submitted_event(uuid) from anon;
+grant usage on schema private to authenticated;
+grant execute on function private.listing_has_submitted_event(uuid) to authenticated;
+
 create or replace function public.prevent_non_admin_role_change()
 returns trigger
 language plpgsql
@@ -145,12 +167,7 @@ with check (
       and listings.owner_id = auth.uid()
       and listings.status in ('draft', 'pending_review')
     )
-    and not exists (
-      select 1
-      from public.moderation_events
-      where moderation_events.listing_id = listing_images.listing_id
-      and moderation_events.action = 'submitted'
-    )
+    and not private.listing_has_submitted_event(listing_images.listing_id)
   )
 );
 
@@ -168,12 +185,7 @@ using (
       and listings.owner_id = auth.uid()
       and listings.status = 'draft'
     )
-    and not exists (
-      select 1
-      from public.moderation_events
-      where moderation_events.listing_id = listing_images.listing_id
-      and moderation_events.action = 'submitted'
-    )
+    and not private.listing_has_submitted_event(listing_images.listing_id)
   )
 )
 with check (
@@ -187,12 +199,7 @@ with check (
       and listings.owner_id = auth.uid()
       and listings.status = 'draft'
     )
-    and not exists (
-      select 1
-      from public.moderation_events
-      where moderation_events.listing_id = listing_images.listing_id
-      and moderation_events.action = 'submitted'
-    )
+    and not private.listing_has_submitted_event(listing_images.listing_id)
   )
 );
 
@@ -210,12 +217,7 @@ using (
       and listings.owner_id = auth.uid()
       and listings.status = 'draft'
     )
-    and not exists (
-      select 1
-      from public.moderation_events
-      where moderation_events.listing_id = listing_images.listing_id
-      and moderation_events.action = 'submitted'
-    )
+    and not private.listing_has_submitted_event(listing_images.listing_id)
   )
 );
 
@@ -231,4 +233,21 @@ using (
 with check (
   bucket_id = 'company-assets'
   and public.is_admin()
+);
+
+drop policy if exists "moderation_events_owner_submit" on public.moderation_events;
+
+create policy "moderation_events_owner_submit"
+on public.moderation_events
+for insert
+with check (
+  action = 'submitted'
+  and actor_id = auth.uid()
+  and exists (
+    select 1
+    from public.listings
+    where listings.id = moderation_events.listing_id
+    and listings.owner_id = auth.uid()
+    and listings.status = 'pending_review'
+  )
 );

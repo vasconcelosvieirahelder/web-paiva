@@ -54,9 +54,16 @@ describe("access control privacy migration", () => {
   it("prevents owners from changing listing images after moderation submission", () => {
     const migration = readFileSync(migrationPath, "utf8");
 
+    expect(migration).toContain("create schema if not exists private");
+    expect(migration).toContain("private.listing_has_submitted_event");
+    expect(migration).toContain("security definer");
+    expect(migration).toContain("set search_path = ''");
+    expect(migration).toContain("revoke all on function private.listing_has_submitted_event(uuid) from public");
+    expect(migration).toContain("revoke execute on function private.listing_has_submitted_event(uuid) from anon");
+    expect(migration).toContain("grant usage on schema private to authenticated");
+    expect(migration).toContain("grant execute on function private.listing_has_submitted_event(uuid) to authenticated");
     expect(migration).toContain("listing_images_owner_insert_before_submission");
-    expect(migration).toContain("not exists (");
-    expect(migration).toContain("moderation_events.action = 'submitted'");
+    expect(migration).toContain("not private.listing_has_submitted_event(listing_images.listing_id)");
     expect(migration).toContain("listing_images_owner_update_draft");
     expect(migration).toContain("listing_images_owner_delete_draft");
   });
@@ -74,6 +81,8 @@ describe("access control privacy migration", () => {
 
     expect(sql).toContain("Only draft listings can be edited by their owner.");
     expect(sql).toContain("Only unsubmitted draft advertiser profiles can be edited by their owner.");
+    expect(sql).toContain("private.listing_has_submitted_event");
+    expect(sql).toContain("set search_path = ''");
     expect(sql).toContain("listing_images_owner_insert_before_submission");
     expect(sql).toContain("listing_images_owner_update_draft");
     expect(sql).toContain("company_assets_admin_update");
