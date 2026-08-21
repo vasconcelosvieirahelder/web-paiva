@@ -2,12 +2,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { SiteHeader } from "@/components/layout/site-header";
-import { Button } from "@/components/ui/button";
 import { isLocale, type Locale } from "@/i18n/config";
 import { getMessages } from "@/i18n/messages";
 import { getLocalizedCategoryName } from "@/lib/listings";
 import { createClient } from "@/lib/supabase/server";
 import { moderateListing } from "./actions";
+import { ModerationForm } from "./moderation-form";
 
 type AdminPageProps = {
   params: Promise<{ locale: string }>;
@@ -124,39 +124,6 @@ async function getEvidenceImages(listing: AdminListing) {
         ...image,
         signedUrl: await getSignedImageUrl(image.storage_path),
       })),
-  );
-}
-
-function ModerationForm({
-  action,
-  label,
-  locale,
-  listingId,
-  variant = "secondary",
-}: {
-  action: "approve" | "reject" | "suspend";
-  label: string;
-  locale: Locale;
-  listingId: string;
-  variant?: "primary" | "secondary";
-}) {
-  return (
-    <form action={moderateListing} className="grid gap-2">
-      <input name="locale" type="hidden" value={locale} />
-      <input name="listingId" type="hidden" value={listingId} />
-      <input name="action" type="hidden" value={action} />
-      {action === "reject" ? (
-        <textarea
-          className="min-h-20 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20"
-          maxLength={500}
-          name="reason"
-          placeholder="Motivo da recusa, opcional"
-        />
-      ) : null}
-      <Button type="submit" variant={variant === "primary" ? undefined : "secondary"}>
-        {label}
-      </Button>
-    </form>
   );
 }
 
@@ -391,9 +358,27 @@ export default async function AdminDashboardPage({ params, searchParams }: Admin
                           )}
                         </div>
                         <div className="grid gap-3 rounded-md border border-slate-200 p-3">
-                          <ModerationForm action="approve" label="Aprovar e publicar" listingId={listing.id} locale={locale} variant="primary" />
-                          <ModerationForm action="reject" label="Recusar" listingId={listing.id} locale={locale} />
-                          <ModerationForm action="suspend" label="Suspender" listingId={listing.id} locale={locale} />
+                          <ModerationForm
+                            action="approve"
+                            formAction={moderateListing}
+                            label="Aprovar e publicar"
+                            listingId={listing.id}
+                            locale={locale}
+                          />
+                          <ModerationForm
+                            action="reject"
+                            formAction={moderateListing}
+                            label="Recusar"
+                            listingId={listing.id}
+                            locale={locale}
+                          />
+                          <ModerationForm
+                            action="suspend"
+                            formAction={moderateListing}
+                            label="Suspender"
+                            listingId={listing.id}
+                            locale={locale}
+                          />
                         </div>
                       </aside>
                     </div>

@@ -167,6 +167,30 @@ body {
   text-decoration-color: currentColor;
 }
 
+:root[data-theme="dark"] .moderation-button-reject:not(:disabled) {
+  background-color: rgba(127, 29, 29, 0.38) !important;
+  border-color: rgba(248, 113, 113, 0.5) !important;
+  color: #fee2e2 !important;
+}
+
+:root[data-theme="dark"] .moderation-button-reject:not(:disabled):hover,
+:root[data-theme="dark"] .moderation-button-reject:not(:disabled):focus-visible {
+  background-color: rgba(153, 27, 27, 0.62) !important;
+  border-color: rgba(252, 165, 165, 0.76) !important;
+}
+
+:root[data-theme="dark"] .moderation-button-suspend:not(:disabled) {
+  background-color: rgba(120, 53, 15, 0.38) !important;
+  border-color: rgba(251, 191, 36, 0.52) !important;
+  color: #fef3c7 !important;
+}
+
+:root[data-theme="dark"] .moderation-button-suspend:not(:disabled):hover,
+:root[data-theme="dark"] .moderation-button-suspend:not(:disabled):focus-visible {
+  background-color: rgba(146, 64, 14, 0.62) !important;
+  border-color: rgba(252, 211, 77, 0.78) !important;
+}
+
 .paiva-page {
   background:
     radial-gradient(circle at 88% 6%, rgba(74, 180, 173, 0.12), transparent 32%),
