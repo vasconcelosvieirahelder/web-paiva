@@ -54,11 +54,22 @@ begin
   end if;
 
   if tg_op = 'INSERT' then
-    if new.status not in ('draft', 'pending_review')
+    if new.owner_id is distinct from auth.uid()
+      or new.status not in ('draft', 'pending_review')
       or new.rejection_reason is not null
       or new.approved_at is not null
       or new.published_at is not null then
       raise exception 'Only administrators can publish or moderate listings.';
+    end if;
+
+    if not exists (
+      select 1
+      from public.advertiser_profiles
+      where advertiser_profiles.id = new.advertiser_profile_id
+      and advertiser_profiles.owner_id = auth.uid()
+      and advertiser_profiles.owner_id = new.owner_id
+    ) then
+      raise exception 'Only administrators can link listings to another advertiser profile.';
     end if;
 
     return new;

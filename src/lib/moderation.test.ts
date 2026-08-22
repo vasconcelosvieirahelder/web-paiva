@@ -4,6 +4,7 @@ import {
   getListingStatusForModerationAction,
   getModerationEventAction,
   isModerationAction,
+  isListingAdvertiserProfileOwnershipConsistent,
 } from "./moderation";
 
 describe("moderation helpers", () => {
@@ -30,5 +31,30 @@ describe("moderation helpers", () => {
     expect(isModerationAction("reject")).toBe(true);
     expect(isModerationAction("suspend")).toBe(true);
     expect(isModerationAction("archive")).toBe(false);
+  });
+
+  it("allows moderation only when listing and advertiser profile have the same owner", () => {
+    expect(
+      isListingAdvertiserProfileOwnershipConsistent({
+        listingOwnerId: "owner-1",
+        advertiserProfileOwnerId: "owner-1",
+      }),
+    ).toBe(true);
+
+    expect(
+      isListingAdvertiserProfileOwnershipConsistent({
+        listingOwnerId: "owner-1",
+        advertiserProfileOwnerId: "owner-2",
+      }),
+    ).toBe(false);
+  });
+
+  it("rejects moderation when the advertiser profile owner is missing", () => {
+    expect(
+      isListingAdvertiserProfileOwnershipConsistent({
+        listingOwnerId: "owner-1",
+        advertiserProfileOwnerId: null,
+      }),
+    ).toBe(false);
   });
 });

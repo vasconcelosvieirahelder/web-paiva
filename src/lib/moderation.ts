@@ -33,3 +33,13 @@ export function getAdvertiserStatusForModerationAction(action: ModerationAction)
 export function getModerationEventAction(action: ModerationAction) {
   return listingStatusByAction[action];
 }
+
+export function isListingAdvertiserProfileOwnershipConsistent({
+  advertiserProfileOwnerId,
+  listingOwnerId,
+}: {
+  advertiserProfileOwnerId: string | null | undefined;
+  listingOwnerId: string | null | undefined;
+}) {
+  return Boolean(listingOwnerId && advertiserProfileOwnerId && listingOwnerId === advertiserProfileOwnerId);
+}
