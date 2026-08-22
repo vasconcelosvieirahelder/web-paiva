@@ -3,6 +3,12 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const migrationPath = join(process.cwd(), "supabase", "migrations", "0007_access_control_privacy.sql");
+const listingProfileOwnershipMigrationPath = join(
+  process.cwd(),
+  "supabase",
+  "migrations",
+  "0008_listing_profile_ownership_security.sql",
+);
 const applyPath = join(process.cwd(), "supabase", "apply-access-control-privacy.sql");
 
 describe("access control privacy migration", () => {
@@ -35,6 +41,19 @@ describe("access control privacy migration", () => {
     expect(migration).toContain("Only draft listings can be edited by their owner.");
     expect(migration).toContain("old.status <> 'draft'");
     expect(migration).toContain("new.status <> 'draft'");
+  });
+
+  it("requires owner listings to use advertiser profiles owned by the same user", () => {
+    const migration = readFileSync(listingProfileOwnershipMigrationPath, "utf8");
+    const sql = readFileSync(applyPath, "utf8");
+
+    for (const source of [migration, sql]) {
+      expect(source).toContain("new.owner_id is distinct from auth.uid()");
+      expect(source).toContain("Only administrators can link listings to another advertiser profile.");
+      expect(source).toContain("advertiser_profiles.id = new.advertiser_profile_id");
+      expect(source).toContain("advertiser_profiles.owner_id = auth.uid()");
+      expect(source).toContain("advertiser_profiles.owner_id = new.owner_id");
+    }
   });
 
   it("prevents non-admin users from activating advertiser profiles directly", () => {

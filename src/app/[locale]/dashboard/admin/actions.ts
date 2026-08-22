@@ -6,6 +6,7 @@ import {
   getAdvertiserStatusForModerationAction,
   getListingStatusForModerationAction,
   getModerationEventAction,
+  isListingAdvertiserProfileOwnershipConsistent,
   isModerationAction,
 } from "@/lib/moderation";
 import { createClient } from "@/lib/supabase/server";
@@ -47,12 +48,27 @@ export async function moderateListing(formData: FormData) {
 
   const { data: listing } = await supabase
     .from("listings")
-    .select("id, advertiser_profile_id")
+    .select("id, owner_id, advertiser_profile_id")
     .eq("id", listingId)
     .single();
 
   if (!listing) {
     redirect(getRedirectPath(locale, "not-found"));
+  }
+
+  const { data: advertiserProfile } = await supabase
+    .from("advertiser_profiles")
+    .select("id, owner_id")
+    .eq("id", listing.advertiser_profile_id)
+    .single();
+
+  if (
+    !isListingAdvertiserProfileOwnershipConsistent({
+      listingOwnerId: listing.owner_id,
+      advertiserProfileOwnerId: advertiserProfile?.owner_id,
+    })
+  ) {
+    redirect(getRedirectPath(locale, "ownership-mismatch"));
   }
 
   const listingStatus = getListingStatusForModerationAction(action);

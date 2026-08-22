@@ -97,6 +97,10 @@ function getAdminStatusMessage(status: string | undefined) {
     return "Não foi possível concluir a ação. Revise os dados e tente novamente.";
   }
 
+  if (status === "ownership-mismatch") {
+    return "A moderação foi interrompida: o anúncio não pertence ao mesmo responsável do perfil vinculado.";
+  }
+
   return null;
 }
 
