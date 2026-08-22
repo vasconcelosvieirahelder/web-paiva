@@ -127,6 +127,19 @@ describe("access control privacy migration", () => {
       expect(source).toContain("advertiser_profiles.status = 'draft'");
       expect(source).toContain("advertiser_profiles.submitted_at is null");
       expect(source).toContain("storage.filename(name) ~ '^(logo|operation)-");
+      expect(source).toContain("array_length(storage.foldername(name), 1) = 2");
+    }
+  });
+
+  it("rejects legacy and nested company asset paths for new owner uploads", () => {
+    const migration = readFileSync(companyAssetsStorageHardeningMigrationPath, "utf8");
+    const sql = readFileSync(applyPath, "utf8");
+
+    for (const source of [migration, sql]) {
+      expect(source).toContain("array_length(storage.foldername(name), 1) = 2");
+      expect(source).toContain("auth.uid()::text = (storage.foldername(name))[1]");
+      expect(source).toContain("advertiser_profiles.id::text = (storage.foldername(name))[2]");
+      expect(source).not.toContain("auth.uid()::text = (storage.foldername(name))[1]\n);");
     }
   });
 
@@ -139,6 +152,30 @@ describe("access control privacy migration", () => {
       expect(source).toContain('create policy "company_assets_admin_delete"');
       expect(source).toContain("for delete");
       expect(source).toContain("advertiser_profiles.submitted_at is null");
+    }
+  });
+
+  it("allows cleanup of a newly created listing only before final submission", () => {
+    const migration = readFileSync(companyAssetsStorageHardeningMigrationPath, "utf8");
+    const sql = readFileSync(applyPath, "utf8");
+
+    for (const source of [migration, sql]) {
+      expect(source).toContain('create policy "listings_owner_delete_before_submission"');
+      expect(source).toContain("not private.listing_has_submitted_event(listings.id)");
+      expect(source).toContain("advertiser_profiles.submitted_at is null");
+    }
+  });
+
+  it("finalizes company registration submission atomically", () => {
+    const migration = readFileSync(companyAssetsStorageHardeningMigrationPath, "utf8");
+    const sql = readFileSync(applyPath, "utf8");
+
+    for (const source of [migration, sql]) {
+      expect(source).toContain("create or replace function public.submit_company_registration");
+      expect(source).toContain("update public.advertiser_profiles");
+      expect(source).toContain("insert into public.moderation_events");
+      expect(source).toContain("set search_path = ''");
+      expect(source).toContain("grant execute on function public.submit_company_registration(uuid, uuid) to authenticated");
     }
   });
 });

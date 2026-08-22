@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildStoragePath, getCompanyImageValidationError, parseCompanyRegistration } from "./company-registration";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 function validFormData() {
   const formData = new FormData();
@@ -75,5 +77,37 @@ describe("company registration", () => {
     expect(path).toMatch(
       /^aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\/logo-[0-9a-f-]+\.png$/,
     );
+  });
+
+  it("tracks uploads one at a time so partial failures can be cleaned up", () => {
+    const actionSource = readFileSync(
+      join(process.cwd(), "src", "app", "[locale]", "dashboard", "advertiser", "company", "actions.ts"),
+      "utf8",
+    );
+
+    expect(actionSource).not.toContain("Promise.all");
+    expect(actionSource).toContain("uploadedImages.push({ kind: \"logo\", path: logoPath })");
+    expect(actionSource).toContain("uploadedImages.push({ kind: \"operation\", path: operationPhotoPath })");
+  });
+
+  it("cleans up listing rows created during a failed registration attempt", () => {
+    const actionSource = readFileSync(
+      join(process.cwd(), "src", "app", "[locale]", "dashboard", "advertiser", "company", "actions.ts"),
+      "utf8",
+    );
+
+    expect(actionSource).toContain('supabase.from("listing_images").delete().eq("listing_id", listingId)');
+    expect(actionSource).toContain('supabase.from("listings").delete().eq("id", listingId)');
+  });
+
+  it("uses one database call for the final submitted event and submitted_at state", () => {
+    const actionSource = readFileSync(
+      join(process.cwd(), "src", "app", "[locale]", "dashboard", "advertiser", "company", "actions.ts"),
+      "utf8",
+    );
+
+    expect(actionSource).toContain('supabase.rpc("submit_company_registration"');
+    expect(actionSource).not.toContain('supabase.from("moderation_events").insert');
+    expect(actionSource).not.toContain("submitted_at: new Date().toISOString()");
   });
 });

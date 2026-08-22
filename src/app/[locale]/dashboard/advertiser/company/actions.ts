@@ -45,6 +45,18 @@ async function uploadCompanyImage(ownerId: string, advertiserProfileId: string, 
   return path;
 }
 
+async function cleanupBestEffort(options: {
+  advertiserProfileId: string | null;
+  listingId: string | null;
+  uploadedImages: UploadedCompanyImage[];
+}) {
+  try {
+    await cleanupCompanyRegistrationAttempt(options);
+  } catch (error) {
+    console.error("Company registration cleanup failed.", error);
+  }
+}
+
 async function cleanupCompanyRegistrationAttempt({
   advertiserProfileId,
   listingId,
@@ -62,6 +74,7 @@ async function cleanupCompanyRegistrationAttempt({
 
   if (listingId) {
     await supabase.from("listing_images").delete().eq("listing_id", listingId);
+    await supabase.from("listings").delete().eq("id", listingId);
   }
 
   if (advertiserProfileId) {
@@ -134,20 +147,19 @@ export async function submitCompanyRegistration(formData: FormData) {
   let listingId: string | null = null;
 
   try {
-    [logoPath, operationPhotoPath] = await Promise.all([
-      uploadCompanyImage(user.id, advertiserProfile.id, logo, "logo"),
-      uploadCompanyImage(user.id, advertiserProfile.id, operationPhoto, "operation"),
-    ]);
+    logoPath = await uploadCompanyImage(user.id, advertiserProfile.id, logo, "logo");
 
     if (logoPath) {
       uploadedImages.push({ kind: "logo", path: logoPath });
     }
 
+    operationPhotoPath = await uploadCompanyImage(user.id, advertiserProfile.id, operationPhoto, "operation");
+
     if (operationPhotoPath) {
       uploadedImages.push({ kind: "operation", path: operationPhotoPath });
     }
   } catch {
-    await cleanupCompanyRegistrationAttempt({
+    await cleanupBestEffort({
       advertiserProfileId: advertiserProfile.id,
       listingId,
       uploadedImages,
@@ -164,7 +176,7 @@ export async function submitCompanyRegistration(formData: FormData) {
     .eq("id", advertiserProfile.id);
 
   if (profileAssetsError) {
-    await cleanupCompanyRegistrationAttempt({
+    await cleanupBestEffort({
       advertiserProfileId: advertiserProfile.id,
       listingId,
       uploadedImages,
@@ -191,7 +203,7 @@ export async function submitCompanyRegistration(formData: FormData) {
     .single();
 
   if (listingError || !listing) {
-    await cleanupCompanyRegistrationAttempt({
+    await cleanupBestEffort({
       advertiserProfileId: advertiserProfile.id,
       listingId,
       uploadedImages,
@@ -228,7 +240,7 @@ export async function submitCompanyRegistration(formData: FormData) {
     const { error: imageError } = await supabase.from("listing_images").insert(imageRows);
 
     if (imageError) {
-      await cleanupCompanyRegistrationAttempt({
+      await cleanupBestEffort({
         advertiserProfileId: advertiserProfile.id,
         listingId,
         uploadedImages,
@@ -237,30 +249,17 @@ export async function submitCompanyRegistration(formData: FormData) {
     }
   }
 
-  const { error: eventError } = await supabase.from("moderation_events").insert({
-    listing_id: listing.id,
-    actor_id: user.id,
-    action: "submitted",
-    reason: "Cadastro enviado para análise.",
+  const { error: submissionError } = await supabase.rpc("submit_company_registration", {
+    p_advertiser_profile_id: advertiserProfile.id,
+    p_listing_id: listing.id,
   });
 
-  if (eventError) {
-    await cleanupCompanyRegistrationAttempt({
+  if (submissionError) {
+    await cleanupBestEffort({
       advertiserProfileId: advertiserProfile.id,
       listingId,
       uploadedImages,
     });
-    redirect(`/${locale}/dashboard/advertiser/company?error=save`);
-  }
-
-  const { error: submittedError } = await supabase
-    .from("advertiser_profiles")
-    .update({
-      submitted_at: new Date().toISOString(),
-    })
-    .eq("id", advertiserProfile.id);
-
-  if (submittedError) {
     redirect(`/${locale}/dashboard/advertiser/company?error=save`);
   }
 
