@@ -9,6 +9,12 @@ const listingProfileOwnershipMigrationPath = join(
   "migrations",
   "0008_listing_profile_ownership_security.sql",
 );
+const companyAssetsStorageHardeningMigrationPath = join(
+  process.cwd(),
+  "supabase",
+  "migrations",
+  "0009_company_assets_storage_hardening.sql",
+);
 const applyPath = join(process.cwd(), "supabase", "apply-access-control-privacy.sql");
 
 describe("access control privacy migration", () => {
@@ -105,5 +111,34 @@ describe("access control privacy migration", () => {
     expect(sql).toContain("listing_images_owner_insert_before_submission");
     expect(sql).toContain("listing_images_owner_update_draft");
     expect(sql).toContain("company_assets_admin_update");
+  });
+
+  it("restricts new company asset uploads to draft advertiser profile folders", () => {
+    const migration = readFileSync(companyAssetsStorageHardeningMigrationPath, "utf8");
+    const sql = readFileSync(applyPath, "utf8");
+
+    for (const source of [migration, sql]) {
+      expect(source).toContain('drop policy if exists "company_assets_owner_insert" on storage.objects');
+      expect(source).toContain('create policy "company_assets_owner_insert_draft_profile"');
+      expect(source).toContain("storage.foldername(name))[1]");
+      expect(source).toContain("storage.foldername(name))[2]");
+      expect(source).toContain("advertiser_profiles.id::text = (storage.foldername(name))[2]");
+      expect(source).toContain("advertiser_profiles.owner_id = auth.uid()");
+      expect(source).toContain("advertiser_profiles.status = 'draft'");
+      expect(source).toContain("advertiser_profiles.submitted_at is null");
+      expect(source).toContain("storage.filename(name) ~ '^(logo|operation)-");
+    }
+  });
+
+  it("allows owner cleanup only before advertiser profile submission", () => {
+    const migration = readFileSync(companyAssetsStorageHardeningMigrationPath, "utf8");
+    const sql = readFileSync(applyPath, "utf8");
+
+    for (const source of [migration, sql]) {
+      expect(source).toContain('create policy "company_assets_owner_delete_draft_profile"');
+      expect(source).toContain('create policy "company_assets_admin_delete"');
+      expect(source).toContain("for delete");
+      expect(source).toContain("advertiser_profiles.submitted_at is null");
+    }
   });
 });

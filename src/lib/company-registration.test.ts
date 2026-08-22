@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCompanyImageValidationError, parseCompanyRegistration } from "./company-registration";
+import { buildStoragePath, getCompanyImageValidationError, parseCompanyRegistration } from "./company-registration";
 
 function validFormData() {
   const formData = new FormData();
@@ -61,5 +61,19 @@ describe("company registration", () => {
     expect(getCompanyImageValidationError(validImage)).toBeNull();
     expect(getCompanyImageValidationError(invalidType)).toBe("unsupported-type");
     expect(getCompanyImageValidationError(oversized)).toBe("too-large");
+  });
+
+  it("builds company asset paths under the owner and advertiser profile folders", () => {
+    const file = new File(["image"], "Minha Logo.PNG", { type: "image/png" });
+    const path = buildStoragePath(
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      file,
+      "logo",
+    );
+
+    expect(path).toMatch(
+      /^aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\/logo-[0-9a-f-]+\.png$/,
+    );
   });
 });
