@@ -9,6 +9,12 @@ const listingProfileOwnershipMigrationPath = join(
   "migrations",
   "0008_listing_profile_ownership_security.sql",
 );
+const companyAssetsStorageHardeningMigrationPath = join(
+  process.cwd(),
+  "supabase",
+  "migrations",
+  "0009_company_assets_storage_hardening.sql",
+);
 const applyPath = join(process.cwd(), "supabase", "apply-access-control-privacy.sql");
 
 describe("access control privacy migration", () => {
@@ -105,5 +111,71 @@ describe("access control privacy migration", () => {
     expect(sql).toContain("listing_images_owner_insert_before_submission");
     expect(sql).toContain("listing_images_owner_update_draft");
     expect(sql).toContain("company_assets_admin_update");
+  });
+
+  it("restricts new company asset uploads to draft advertiser profile folders", () => {
+    const migration = readFileSync(companyAssetsStorageHardeningMigrationPath, "utf8");
+    const sql = readFileSync(applyPath, "utf8");
+
+    for (const source of [migration, sql]) {
+      expect(source).toContain('drop policy if exists "company_assets_owner_insert" on storage.objects');
+      expect(source).toContain('create policy "company_assets_owner_insert_draft_profile"');
+      expect(source).toContain("storage.foldername(name))[1]");
+      expect(source).toContain("storage.foldername(name))[2]");
+      expect(source).toContain("advertiser_profiles.id::text = (storage.foldername(name))[2]");
+      expect(source).toContain("advertiser_profiles.owner_id = auth.uid()");
+      expect(source).toContain("advertiser_profiles.status = 'draft'");
+      expect(source).toContain("advertiser_profiles.submitted_at is null");
+      expect(source).toContain("storage.filename(name) ~ '^(logo|operation)-");
+      expect(source).toContain("array_length(storage.foldername(name), 1) = 2");
+    }
+  });
+
+  it("rejects legacy and nested company asset paths for new owner uploads", () => {
+    const migration = readFileSync(companyAssetsStorageHardeningMigrationPath, "utf8");
+    const sql = readFileSync(applyPath, "utf8");
+
+    for (const source of [migration, sql]) {
+      expect(source).toContain("array_length(storage.foldername(name), 1) = 2");
+      expect(source).toContain("auth.uid()::text = (storage.foldername(name))[1]");
+      expect(source).toContain("advertiser_profiles.id::text = (storage.foldername(name))[2]");
+      expect(source).not.toContain("auth.uid()::text = (storage.foldername(name))[1]\n);");
+    }
+  });
+
+  it("allows owner cleanup only before advertiser profile submission", () => {
+    const migration = readFileSync(companyAssetsStorageHardeningMigrationPath, "utf8");
+    const sql = readFileSync(applyPath, "utf8");
+
+    for (const source of [migration, sql]) {
+      expect(source).toContain('create policy "company_assets_owner_delete_draft_profile"');
+      expect(source).toContain('create policy "company_assets_admin_delete"');
+      expect(source).toContain("for delete");
+      expect(source).toContain("advertiser_profiles.submitted_at is null");
+    }
+  });
+
+  it("allows cleanup of a newly created listing only before final submission", () => {
+    const migration = readFileSync(companyAssetsStorageHardeningMigrationPath, "utf8");
+    const sql = readFileSync(applyPath, "utf8");
+
+    for (const source of [migration, sql]) {
+      expect(source).toContain('create policy "listings_owner_delete_before_submission"');
+      expect(source).toContain("not private.listing_has_submitted_event(listings.id)");
+      expect(source).toContain("advertiser_profiles.submitted_at is null");
+    }
+  });
+
+  it("finalizes company registration submission atomically", () => {
+    const migration = readFileSync(companyAssetsStorageHardeningMigrationPath, "utf8");
+    const sql = readFileSync(applyPath, "utf8");
+
+    for (const source of [migration, sql]) {
+      expect(source).toContain("create or replace function public.submit_company_registration");
+      expect(source).toContain("update public.advertiser_profiles");
+      expect(source).toContain("insert into public.moderation_events");
+      expect(source).toContain("set search_path = ''");
+      expect(source).toContain("grant execute on function public.submit_company_registration(uuid, uuid) to authenticated");
+    }
   });
 });

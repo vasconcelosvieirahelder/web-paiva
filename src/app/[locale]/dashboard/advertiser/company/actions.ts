@@ -11,13 +11,18 @@ function getLocale(formData: FormData): Locale {
   return isLocale(locale) ? locale : "pt-BR";
 }
 
+type UploadedCompanyImage = {
+  kind: "logo" | "operation";
+  path: string;
+};
+
 function getImage(formData: FormData, key: string) {
   const value = formData.get(key);
 
   return value instanceof File && value.size > 0 ? value : null;
 }
 
-async function uploadCompanyImage(ownerId: string, file: File | null, kind: "logo" | "operation") {
+async function uploadCompanyImage(ownerId: string, advertiserProfileId: string, file: File | null, kind: "logo" | "operation") {
   if (!file) {
     return null;
   }
@@ -27,7 +32,7 @@ async function uploadCompanyImage(ownerId: string, file: File | null, kind: "log
   }
 
   const supabase = await createClient();
-  const path = buildStoragePath(ownerId, file, kind);
+  const path = buildStoragePath(ownerId, advertiserProfileId, file, kind);
   const { error } = await supabase.storage.from("company-assets").upload(path, file, {
     contentType: file.type || "image/jpeg",
     upsert: false,
@@ -38,6 +43,53 @@ async function uploadCompanyImage(ownerId: string, file: File | null, kind: "log
   }
 
   return path;
+}
+
+async function cleanupBestEffort(options: {
+  advertiserProfileId: string | null;
+  listingId: string | null;
+  uploadedImages: UploadedCompanyImage[];
+}) {
+  try {
+    await cleanupCompanyRegistrationAttempt(options);
+  } catch (error) {
+    console.error("Company registration cleanup failed.", error);
+  }
+}
+
+async function cleanupCompanyRegistrationAttempt({
+  advertiserProfileId,
+  listingId,
+  uploadedImages,
+}: {
+  advertiserProfileId: string | null;
+  listingId: string | null;
+  uploadedImages: UploadedCompanyImage[];
+}) {
+  if (uploadedImages.length === 0 && !advertiserProfileId && !listingId) {
+    return;
+  }
+
+  const supabase = await createClient();
+
+  if (listingId) {
+    await supabase.from("listing_images").delete().eq("listing_id", listingId);
+    await supabase.from("listings").delete().eq("id", listingId);
+  }
+
+  if (advertiserProfileId) {
+    await supabase
+      .from("advertiser_profiles")
+      .update({
+        logo_storage_path: null,
+        operation_photo_storage_path: null,
+      })
+      .eq("id", advertiserProfileId);
+  }
+
+  if (uploadedImages.length > 0) {
+    await supabase.storage.from("company-assets").remove(uploadedImages.map((image) => image.path));
+  }
 }
 
 export async function submitCompanyRegistration(formData: FormData) {
@@ -64,18 +116,6 @@ export async function submitCompanyRegistration(formData: FormData) {
     redirect(`/${locale}/dashboard/advertiser/company?error=image`);
   }
 
-  let logoPath: string | null = null;
-  let operationPhotoPath: string | null = null;
-
-  try {
-    [logoPath, operationPhotoPath] = await Promise.all([
-      uploadCompanyImage(user.id, logo, "logo"),
-      uploadCompanyImage(user.id, operationPhoto, "operation"),
-    ]);
-  } catch {
-    redirect(`/${locale}/dashboard/advertiser/company?error=image`);
-  }
-
   const { data: advertiserProfile, error: profileError } = await supabase
     .from("advertiser_profiles")
     .insert({
@@ -87,17 +127,60 @@ export async function submitCompanyRegistration(formData: FormData) {
       phone: parsed.data.phone || null,
       email: parsed.data.email || null,
       status: "draft",
-      logo_storage_path: logoPath,
-      operation_photo_storage_path: operationPhotoPath,
+      logo_storage_path: null,
+      operation_photo_storage_path: null,
       reference_name: parsed.data.referenceName || null,
       reference_phone: parsed.data.referencePhone,
       reference_notes: parsed.data.referenceNotes || null,
-      submitted_at: new Date().toISOString(),
+      submitted_at: null,
     })
     .select("id")
     .single();
 
   if (profileError || !advertiserProfile) {
+    redirect(`/${locale}/dashboard/advertiser/company?error=save`);
+  }
+
+  let logoPath: string | null = null;
+  let operationPhotoPath: string | null = null;
+  const uploadedImages: UploadedCompanyImage[] = [];
+  let listingId: string | null = null;
+
+  try {
+    logoPath = await uploadCompanyImage(user.id, advertiserProfile.id, logo, "logo");
+
+    if (logoPath) {
+      uploadedImages.push({ kind: "logo", path: logoPath });
+    }
+
+    operationPhotoPath = await uploadCompanyImage(user.id, advertiserProfile.id, operationPhoto, "operation");
+
+    if (operationPhotoPath) {
+      uploadedImages.push({ kind: "operation", path: operationPhotoPath });
+    }
+  } catch {
+    await cleanupBestEffort({
+      advertiserProfileId: advertiserProfile.id,
+      listingId,
+      uploadedImages,
+    });
+    redirect(`/${locale}/dashboard/advertiser/company?error=image`);
+  }
+
+  const { error: profileAssetsError } = await supabase
+    .from("advertiser_profiles")
+    .update({
+      logo_storage_path: logoPath,
+      operation_photo_storage_path: operationPhotoPath,
+    })
+    .eq("id", advertiserProfile.id);
+
+  if (profileAssetsError) {
+    await cleanupBestEffort({
+      advertiserProfileId: advertiserProfile.id,
+      listingId,
+      uploadedImages,
+    });
     redirect(`/${locale}/dashboard/advertiser/company?error=save`);
   }
 
@@ -120,8 +203,15 @@ export async function submitCompanyRegistration(formData: FormData) {
     .single();
 
   if (listingError || !listing) {
+    await cleanupBestEffort({
+      advertiserProfileId: advertiserProfile.id,
+      listingId,
+      uploadedImages,
+    });
     redirect(`/${locale}/dashboard/advertiser/company?error=save`);
   }
+
+  listingId = listing.id;
 
   const imageRows = [
     logoPath
@@ -150,16 +240,28 @@ export async function submitCompanyRegistration(formData: FormData) {
     const { error: imageError } = await supabase.from("listing_images").insert(imageRows);
 
     if (imageError) {
+      await cleanupBestEffort({
+        advertiserProfileId: advertiserProfile.id,
+        listingId,
+        uploadedImages,
+      });
       redirect(`/${locale}/dashboard/advertiser/company?error=save`);
     }
   }
 
-  await supabase.from("moderation_events").insert({
-    listing_id: listing.id,
-    actor_id: user.id,
-    action: "submitted",
-    reason: "Cadastro enviado para análise.",
+  const { error: submissionError } = await supabase.rpc("submit_company_registration", {
+    p_advertiser_profile_id: advertiserProfile.id,
+    p_listing_id: listing.id,
   });
+
+  if (submissionError) {
+    await cleanupBestEffort({
+      advertiserProfileId: advertiserProfile.id,
+      listingId,
+      uploadedImages,
+    });
+    redirect(`/${locale}/dashboard/advertiser/company?error=save`);
+  }
 
   redirect(`/${locale}/dashboard/advertiser?status=submitted`);
 }

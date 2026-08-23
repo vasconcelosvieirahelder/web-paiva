@@ -57,11 +57,11 @@ export function parseCompanyRegistration(formData: FormData) {
   });
 }
 
-export function buildStoragePath(ownerId: string, file: File, kind: "logo" | "operation") {
+export function buildStoragePath(ownerId: string, advertiserProfileId: string, file: File, kind: "logo" | "operation") {
   const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
   const safeExtension = ["jpg", "jpeg", "png", "webp"].includes(extension) ? extension : "jpg";
 
-  return `${ownerId}/${kind}-${crypto.randomUUID()}.${safeExtension}`;
+  return `${ownerId}/${advertiserProfileId}/${kind}-${crypto.randomUUID()}.${safeExtension}`;
 }
 
 export function getCompanyImageValidationError(file: File | null) {
