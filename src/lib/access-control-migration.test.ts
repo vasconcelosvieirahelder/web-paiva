@@ -131,6 +131,27 @@ describe("access control privacy migration", () => {
     }
   });
 
+  it("matches only company asset filenames with standard UUID format", () => {
+    const migration = readFileSync(companyAssetsStorageHardeningMigrationPath, "utf8");
+    const sql = readFileSync(applyPath, "utf8");
+    const uuidFilenameRegex =
+      "^(logo|operation)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(jpg|jpeg|png|webp)$";
+    const compiledRegex = new RegExp(uuidFilenameRegex);
+
+    expect(compiledRegex.test("logo-55b04750-3b1f-4873-b70d-5ebb69899da9.webp")).toBe(true);
+    expect(compiledRegex.test("operation-55b04750-3b1f-4873-b70d-5ebb69899da9.png")).toBe(true);
+    expect(compiledRegex.test("logo-55b04750-3b1f-4873-5ebb69899da9.webp")).toBe(false);
+    expect(compiledRegex.test("avatar-55b04750-3b1f-4873-b70d-5ebb69899da9.webp")).toBe(false);
+    expect(compiledRegex.test("logo-55b04750-3b1f-4873-b70d-5ebb69899da9.gif")).toBe(false);
+
+    for (const source of [migration, sql]) {
+      expect(source).toContain(`storage.filename(name) ~ '${uuidFilenameRegex}'`);
+      expect(source).not.toContain(
+        "storage.filename(name) ~ '^(logo|operation)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(jpg|jpeg|png|webp)$'",
+      );
+    }
+  });
+
   it("rejects legacy and nested company asset paths for new owner uploads", () => {
     const migration = readFileSync(companyAssetsStorageHardeningMigrationPath, "utf8");
     const sql = readFileSync(applyPath, "utf8");
