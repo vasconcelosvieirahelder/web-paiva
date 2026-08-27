@@ -1,5 +1,7 @@
 export const listingInteractionEventTypes = ["view", "contact_click", "whatsapp_click"] as const;
 
+export const listingInteractionSessionCookie = "web_paiva_interaction_session";
+
 export type ListingInteractionEventType = (typeof listingInteractionEventTypes)[number];
 
 export const listingIdPattern =
@@ -7,6 +9,7 @@ export const listingIdPattern =
 
 export type ListingInteractionRow = {
   event_type: string;
+  is_owner_or_admin?: boolean | null;
 };
 
 export type ListingInteractionSummary = {
@@ -22,6 +25,10 @@ export function isListingInteractionEventType(value: string): value is ListingIn
 export function summarizeListingInteractions(rows: ListingInteractionRow[]): ListingInteractionSummary {
   return rows.reduce<ListingInteractionSummary>(
     (summary, row) => {
+      if (row.is_owner_or_admin === true) {
+        return summary;
+      }
+
       if (row.event_type === "view") {
         summary.views += 1;
       }
@@ -39,6 +46,11 @@ export function summarizeListingInteractions(rows: ListingInteractionRow[]): Lis
     { contactClicks: 0, views: 0, whatsappClicks: 0 },
   );
 }
+
+export function getInteractionDayUTC(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
 
 export function getListingActiveDays(activeSince: string | null | undefined, now = new Date()) {
   if (!activeSince) {

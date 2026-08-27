@@ -6,6 +6,7 @@ export type AdvertiserDashboardListing = {
   id: string;
   listing_interactions: Array<{
     event_type: string;
+    is_owner_or_admin: boolean | null;
   }> | null;
   published_at: string | null;
   title: string;
@@ -35,7 +36,8 @@ export async function getApprovedListingsForAdvertiserDashboard(supabase: Supaba
         created_at,
         published_at,
         listing_interactions (
-          event_type
+          event_type,
+          is_owner_or_admin
         )
       `,
     )

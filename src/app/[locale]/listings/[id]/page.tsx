@@ -4,10 +4,10 @@ import { notFound } from "next/navigation";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ContactReveal } from "@/components/listings/contact-reveal";
+import { ListingViewTracker } from "@/components/listings/listing-view-tracker";
 import { Button } from "@/components/ui/button";
 import { isLocale } from "@/i18n/config";
 import { getMessages } from "@/i18n/messages";
-import { recordListingInteraction } from "@/lib/listing-interactions-server";
 import { getListingContacts, getListingImage, getLocalizedCategoryName, getLocalizedListingContent, getLocalizedLocationName } from "@/lib/listings";
 import { createClient } from "@/lib/supabase/server";
 import { updateListingDetailsAction } from "./actions";
@@ -95,10 +95,9 @@ export default async function ListingDetailPage({ params, searchParams }: Listin
   const isAdmin = profile?.role === "admin";
   const adminStatusMessage = getAdminEditStatusMessage(status);
 
-  await recordListingInteraction(listing.id, "view");
-
   return (
     <div className="paiva-page min-h-screen text-slate-950">
+      <ListingViewTracker listingId={listing.id} />
       <SiteHeader isAuthenticated={Boolean(user)} locale={locale} messages={t} />
       <main className="mx-auto max-w-4xl px-4 py-10">
         <Link className="text-sm font-medium text-teal-700 hover:text-teal-800" href={`/${locale}`}>
