@@ -1,13 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { hashVisitorSessionId } from "@/lib/listing-interaction-session";
+import { buildInteractionIdentity, getInteractionFingerprintSecret } from "@/lib/listing-interaction-session";
 import {
   isListingInteractionEventType,
   listingIdPattern,
   listingInteractionSessionCookie,
 } from "@/lib/listing-interactions";
 import { recordListingInteraction } from "@/lib/listing-interactions-server";
+import { createClient } from "@/lib/supabase/server";
 
 const sessionCookieMaxAge = 60 * 60 * 24 * 180;
 
@@ -26,11 +27,23 @@ export async function POST(request: Request) {
   const cookieStore = await cookies();
   const existingSessionId = cookieStore.get(listingInteractionSessionCookie)?.value;
   const visitorSessionId = existingSessionId || randomUUID();
-  const visitorSessionHash = hashVisitorSessionId(visitorSessionId);
 
   try {
-    const counted = await recordListingInteraction(listingId, eventType, visitorSessionHash);
+    const interactionIdentity = buildInteractionIdentity({
+      acceptLanguage: request.headers.get("accept-language"),
+      forwardedFor: request.headers.get("x-forwarded-for"),
+      secret: getInteractionFingerprintSecret(),
+      userAgent: request.headers.get("user-agent"),
+      visitorSessionId,
+    });
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const counted = await recordListingInteraction(listingId, eventType, interactionIdentity, user?.id ?? null);
     const response = NextResponse.json({ counted, ok: true });
+
+    // Cookie deletion, browser changes, or network changes can still create a new pseudonymous identity.
 
     if (!existingSessionId) {
       response.cookies.set({

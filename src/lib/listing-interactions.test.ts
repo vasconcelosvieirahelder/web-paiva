@@ -4,7 +4,7 @@ import {
   getListingActiveDays,
   summarizeListingInteractions,
 } from "./listing-interactions";
-import { hashVisitorSessionId } from "./listing-interaction-session";
+import { buildInteractionIdentity, hashVisitorSessionId } from "./listing-interaction-session";
 
 describe("listing interactions", () => {
   it("summarizes views, contact clicks, and WhatsApp clicks", () => {
@@ -70,5 +70,44 @@ describe("listing interactions", () => {
     expect(hash).not.toBe(rawSession);
     expect(hash).toHaveLength(64);
     expect(hashVisitorSessionId(rawSession)).toBe(hash);
+  });
+
+  it("uses server-observed request data when the browser does not keep a cookie", () => {
+    const identityA = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      forwardedFor: "203.0.113.10",
+      secret: "server-only-secret",
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: null,
+    });
+    const identityB = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      forwardedFor: "203.0.113.10",
+      secret: "server-only-secret",
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: null,
+    });
+
+    expect(identityA).toBe(identityB);
+    expect(identityA).toHaveLength(64);
+  });
+
+  it("does not let cookie rotation change the server-side interaction identity", () => {
+    const identityA = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      forwardedFor: "203.0.113.10",
+      secret: "server-only-secret",
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: "session-a",
+    });
+    const identityB = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      forwardedFor: "203.0.113.10",
+      secret: "server-only-secret",
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: "session-b",
+    });
+
+    expect(identityA).toBe(identityB);
   });
 });

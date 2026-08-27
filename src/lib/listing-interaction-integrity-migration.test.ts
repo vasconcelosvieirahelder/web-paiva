@@ -29,16 +29,20 @@ describe("listing interaction integrity migration", () => {
     expect(migration).toContain("where visitor_session_id is not null");
   });
 
-  it("removes direct public insert and exposes only the controlled RPC", () => {
+  it("removes direct public insert and keeps the write RPC server-only", () => {
     const migration = readSql(migrationPath);
 
     expect(migration).toContain('drop policy if exists "Anyone can record approved listing interactions"');
     expect(migration).toContain("create or replace function public.record_listing_interaction");
     expect(migration).toContain("security definer");
     expect(migration).toContain("set search_path = ''");
-    expect(migration).toContain("revoke all on function public.record_listing_interaction(uuid, text, text) from public");
-    expect(migration).toContain("grant execute on function public.record_listing_interaction(uuid, text, text) to anon");
-    expect(migration).toContain("grant execute on function public.record_listing_interaction(uuid, text, text) to authenticated");
+    expect(migration).toContain("p_actor_user_id uuid default null");
+    expect(migration).toContain("revoke all on function public.record_listing_interaction(uuid, text, text, uuid) from public");
+    expect(migration).toContain("revoke execute on function public.record_listing_interaction(uuid, text, text, uuid) from anon");
+    expect(migration).toContain("revoke execute on function public.record_listing_interaction(uuid, text, text, uuid) from authenticated");
+    expect(migration).toContain("grant execute on function public.record_listing_interaction(uuid, text, text, uuid) to service_role");
+    expect(migration).not.toContain("grant execute on function public.record_listing_interaction(uuid, text, text, uuid) to anon");
+    expect(migration).not.toContain("grant execute on function public.record_listing_interaction(uuid, text, text, uuid) to authenticated");
   });
 
   it("keeps the manual listing interaction SQL aligned with the migration", () => {
@@ -50,7 +54,8 @@ describe("listing interaction integrity migration", () => {
       expect(source).toContain("public.record_listing_interaction");
       expect(source).toContain("on conflict (listing_id, event_type, visitor_session_id, interaction_day)");
       expect(source).toContain("returning true into v_counted");
-      expect(source).toContain("coalesce(v_is_owner, false) or public.is_admin()");
+      expect(source).toContain("p_actor_user_id is not null and v_listing_owner_id = p_actor_user_id");
+      expect(source).toContain("profiles.role = 'admin'");
     }
   });
 
@@ -58,8 +63,16 @@ describe("listing interaction integrity migration", () => {
     const route = readSql(apiRoutePath);
 
     expect(route).toContain("cookieStore.get(listingInteractionSessionCookie)");
-    expect(route).toContain("hashVisitorSessionId(visitorSessionId)");
-    expect(route).toContain("recordListingInteraction(listingId, eventType, visitorSessionHash)");
+    expect(route).toContain("buildInteractionIdentity");
+    expect(route).toContain("getInteractionFingerprintSecret()");
+    expect(route).toContain("request.headers.get");
+    expect(route).toContain("recordListingInteraction(listingId, eventType, interactionIdentity, user?.id ?? null)");
     expect(route).not.toContain("body?.visitorSessionId");
+  });
+
+  it("documents the residual behavior when a visitor deliberately changes identity", () => {
+    const route = readSql(apiRoutePath);
+
+    expect(route).toContain("Cookie deletion, browser changes, or network changes can still create a new pseudonymous identity.");
   });
 });

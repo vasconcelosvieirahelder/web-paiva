@@ -55,7 +55,8 @@ using (
 create or replace function public.record_listing_interaction(
   p_listing_id uuid,
   p_event_type text,
-  p_visitor_session_id text
+  p_visitor_session_id text,
+  p_actor_user_id uuid default null
 )
 returns boolean
 language plpgsql
@@ -63,10 +64,10 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_actor_user_id uuid := auth.uid();
   v_listing_owner_id uuid;
   v_counted boolean := false;
   v_is_owner boolean := false;
+  v_is_admin boolean := false;
   v_is_owner_or_admin boolean := false;
 begin
   if p_event_type not in ('view', 'contact_click', 'whatsapp_click') then
@@ -87,8 +88,15 @@ begin
     return false;
   end if;
 
-  v_is_owner := v_actor_user_id is not null and v_listing_owner_id = v_actor_user_id;
-  v_is_owner_or_admin := coalesce(v_is_owner, false) or public.is_admin();
+  v_is_owner := p_actor_user_id is not null and v_listing_owner_id = p_actor_user_id;
+  select exists (
+    select 1
+    from public.profiles
+    where profiles.id = p_actor_user_id
+    and profiles.role = 'admin'
+  )
+  into v_is_admin;
+  v_is_owner_or_admin := coalesce(v_is_owner, false) or coalesce(v_is_admin, false);
 
   insert into public.listing_interactions (
     listing_id,
@@ -103,7 +111,7 @@ begin
     p_event_type,
     p_visitor_session_id,
     (now() at time zone 'utc')::date,
-    v_actor_user_id,
+    p_actor_user_id,
     v_is_owner_or_admin
   )
   on conflict (listing_id, event_type, visitor_session_id, interaction_day)
@@ -115,10 +123,9 @@ begin
 end;
 $$;
 
-revoke all on function public.record_listing_interaction(uuid, text, text) from public;
-revoke execute on function public.record_listing_interaction(uuid, text, text) from anon;
-revoke execute on function public.record_listing_interaction(uuid, text, text) from authenticated;
-grant execute on function public.record_listing_interaction(uuid, text, text) to anon;
-grant execute on function public.record_listing_interaction(uuid, text, text) to authenticated;
+revoke all on function public.record_listing_interaction(uuid, text, text, uuid) from public;
+revoke execute on function public.record_listing_interaction(uuid, text, text, uuid) from anon;
+revoke execute on function public.record_listing_interaction(uuid, text, text, uuid) from authenticated;
+grant execute on function public.record_listing_interaction(uuid, text, text, uuid) to service_role;
 
 select 'OK: tabela e politicas de interacoes de anuncios configuradas.' as resultado;
