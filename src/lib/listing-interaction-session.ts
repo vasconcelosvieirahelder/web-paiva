@@ -3,8 +3,8 @@ import { env } from "./env";
 
 type InteractionIdentityInput = {
   acceptLanguage: string | null;
-  forwardedFor: string | null;
   secret: string;
+  trustedIp: string | null;
   userAgent: string | null;
   visitorSessionId: string | null;
 };
@@ -21,26 +21,24 @@ function getFirstForwardedAddress(forwardedFor: string | null) {
   return forwardedFor?.split(",")[0]?.trim() || null;
 }
 
+export function getTrustedInfrastructureIp(headers: Headers) {
+  // In production on Vercel, this platform-managed header is the trusted source.
+  // Generic x-forwarded-for is intentionally ignored because clients can spoof it.
+  return getFirstForwardedAddress(headers.get("x-vercel-forwarded-for"));
+}
+
 export function buildInteractionIdentity({
   acceptLanguage,
-  forwardedFor,
   secret,
+  trustedIp,
   userAgent,
   visitorSessionId,
 }: InteractionIdentityInput) {
-  const serverObservedIdentity = [
-    "ip",
-    normalizeHeader(getFirstForwardedAddress(forwardedFor)),
-    "ua",
-    normalizeHeader(userAgent),
-    "lang",
-    normalizeHeader(acceptLanguage),
-  ].join(":");
-
-  const fallbackIdentity = visitorSessionId ? `cookie:${hashVisitorSessionId(visitorSessionId)}` : "cookie:none";
-  const identityMaterial = serverObservedIdentity.includes("unknown:ua:unknown")
-    ? `${serverObservedIdentity}:${fallbackIdentity}`
-    : serverObservedIdentity;
+  const requestContext = ["ua", normalizeHeader(userAgent), "lang", normalizeHeader(acceptLanguage)].join(":");
+  const identitySource = trustedIp
+    ? `ip:${normalizeHeader(trustedIp)}`
+    : `cookie:${visitorSessionId ? hashVisitorSessionId(visitorSessionId) : "none"}`;
+  const identityMaterial = `${identitySource}:${requestContext}`;
 
   return createHmac("sha256", secret).update(identityMaterial).digest("hex");
 }

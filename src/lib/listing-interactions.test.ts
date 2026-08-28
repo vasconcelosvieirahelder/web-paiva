@@ -4,7 +4,7 @@ import {
   getListingActiveDays,
   summarizeListingInteractions,
 } from "./listing-interactions";
-import { buildInteractionIdentity, hashVisitorSessionId } from "./listing-interaction-session";
+import { buildInteractionIdentity, getTrustedInfrastructureIp, hashVisitorSessionId } from "./listing-interaction-session";
 
 describe("listing interactions", () => {
   it("summarizes views, contact clicks, and WhatsApp clicks", () => {
@@ -72,18 +72,18 @@ describe("listing interactions", () => {
     expect(hashVisitorSessionId(rawSession)).toBe(hash);
   });
 
-  it("uses server-observed request data when the browser does not keep a cookie", () => {
+  it("uses trusted infrastructure IP when the browser does not keep a cookie", () => {
     const identityA = buildInteractionIdentity({
       acceptLanguage: "pt-BR",
-      forwardedFor: "203.0.113.10",
       secret: "server-only-secret",
+      trustedIp: "203.0.113.10",
       userAgent: "Mozilla/5.0",
       visitorSessionId: null,
     });
     const identityB = buildInteractionIdentity({
       acceptLanguage: "pt-BR",
-      forwardedFor: "203.0.113.10",
       secret: "server-only-secret",
+      trustedIp: "203.0.113.10",
       userAgent: "Mozilla/5.0",
       visitorSessionId: null,
     });
@@ -92,22 +92,70 @@ describe("listing interactions", () => {
     expect(identityA).toHaveLength(64);
   });
 
-  it("does not let cookie rotation change the server-side interaction identity", () => {
+  it("uses different cookies to avoid undercounting when there is no trusted IP", () => {
     const identityA = buildInteractionIdentity({
       acceptLanguage: "pt-BR",
-      forwardedFor: "203.0.113.10",
       secret: "server-only-secret",
+      trustedIp: null,
       userAgent: "Mozilla/5.0",
       visitorSessionId: "session-a",
     });
     const identityB = buildInteractionIdentity({
       acceptLanguage: "pt-BR",
-      forwardedFor: "203.0.113.10",
       secret: "server-only-secret",
+      trustedIp: null,
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: "session-b",
+    });
+
+    expect(identityA).not.toBe(identityB);
+  });
+
+  it("keeps the same cookie and context on the same interaction identity", () => {
+    const input = {
+      acceptLanguage: "pt-BR",
+      secret: "server-only-secret",
+      trustedIp: null,
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: "session-a",
+    };
+
+    expect(buildInteractionIdentity(input)).toBe(buildInteractionIdentity(input));
+  });
+
+  it("uses trusted infrastructure IP when it is available", () => {
+    const identityA = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      secret: "server-only-secret",
+      trustedIp: "203.0.113.10",
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: "session-a",
+    });
+    const identityB = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      secret: "server-only-secret",
+      trustedIp: "203.0.113.10",
       userAgent: "Mozilla/5.0",
       visitorSessionId: "session-b",
     });
 
     expect(identityA).toBe(identityB);
+  });
+
+  it("does not trust generic forwarded headers for the interaction identity", () => {
+    const headers = new Headers({
+      "x-forwarded-for": "198.51.100.99",
+    });
+
+    expect(getTrustedInfrastructureIp(headers)).toBeNull();
+  });
+
+  it("uses the Vercel forwarded IP header as the trusted production source", () => {
+    const headers = new Headers({
+      "x-forwarded-for": "198.51.100.99",
+      "x-vercel-forwarded-for": "203.0.113.10",
+    });
+
+    expect(getTrustedInfrastructureIp(headers)).toBe("203.0.113.10");
   });
 });

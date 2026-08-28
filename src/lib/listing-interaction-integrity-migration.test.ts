@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const migrationPath = join(process.cwd(), "supabase", "migrations", "0010_listing_interaction_integrity.sql");
 const applyPath = join(process.cwd(), "supabase", "apply-listing-interactions.sql");
 const apiRoutePath = join(process.cwd(), "src", "app", "api", "listing-interactions", "route.ts");
+const serviceClientPath = join(process.cwd(), "src", "lib", "supabase", "service.ts");
 
 function readSql(path: string) {
   return existsSync(path) ? readFileSync(path, "utf8") : "";
@@ -64,15 +65,25 @@ describe("listing interaction integrity migration", () => {
 
     expect(route).toContain("cookieStore.get(listingInteractionSessionCookie)");
     expect(route).toContain("buildInteractionIdentity");
+    expect(route).toContain("getTrustedInfrastructureIp(request.headers)");
     expect(route).toContain("getInteractionFingerprintSecret()");
-    expect(route).toContain("request.headers.get");
     expect(route).toContain("recordListingInteraction(listingId, eventType, interactionIdentity, user?.id ?? null)");
     expect(route).not.toContain("body?.visitorSessionId");
+    expect(route).not.toContain('request.headers.get("x-forwarded-for")');
   });
 
   it("documents the residual behavior when a visitor deliberately changes identity", () => {
     const route = readSql(apiRoutePath);
 
-    expect(route).toContain("Cookie deletion, browser changes, or network changes can still create a new pseudonymous identity.");
+    expect(route).toContain(
+      "Cookie deletion, browser changes, or trusted network changes can still create a new pseudonymous identity.",
+    );
+  });
+
+  it("keeps the service role Supabase client server-only", () => {
+    const serviceClient = readSql(serviceClientPath);
+
+    expect(serviceClient).toContain('import "server-only";');
+    expect(serviceClient).toContain("SUPABASE_SERVICE_ROLE_KEY");
   });
 });

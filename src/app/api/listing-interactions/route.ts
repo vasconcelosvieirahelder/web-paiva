@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { buildInteractionIdentity, getInteractionFingerprintSecret } from "@/lib/listing-interaction-session";
+import {
+  buildInteractionIdentity,
+  getInteractionFingerprintSecret,
+  getTrustedInfrastructureIp,
+} from "@/lib/listing-interaction-session";
 import {
   isListingInteractionEventType,
   listingIdPattern,
@@ -31,8 +35,8 @@ export async function POST(request: Request) {
   try {
     const interactionIdentity = buildInteractionIdentity({
       acceptLanguage: request.headers.get("accept-language"),
-      forwardedFor: request.headers.get("x-forwarded-for"),
       secret: getInteractionFingerprintSecret(),
+      trustedIp: getTrustedInfrastructureIp(request.headers),
       userAgent: request.headers.get("user-agent"),
       visitorSessionId,
     });
@@ -43,7 +47,7 @@ export async function POST(request: Request) {
     const counted = await recordListingInteraction(listingId, eventType, interactionIdentity, user?.id ?? null);
     const response = NextResponse.json({ counted, ok: true });
 
-    // Cookie deletion, browser changes, or network changes can still create a new pseudonymous identity.
+    // Cookie deletion, browser changes, or trusted network changes can still create a new pseudonymous identity.
 
     if (!existingSessionId) {
       response.cookies.set({
