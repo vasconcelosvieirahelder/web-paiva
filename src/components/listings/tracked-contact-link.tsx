@@ -1,13 +1,14 @@
 "use client";
 
 import type { ListingContact } from "@/lib/listings";
+import type { ListingInteractionEventType } from "@/lib/listing-interactions";
 
 type TrackedContactLinkProps = {
   contact: ListingContact;
   listingId: string;
 };
 
-export function trackListingInteraction(listingId: string, eventType: "contact_click" | "whatsapp_click") {
+export function trackListingInteraction(listingId: string, eventType: ListingInteractionEventType) {
   const payload = JSON.stringify({
     eventType,
     listingId,
