@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const migrationPath = join(process.cwd(), "supabase", "migrations", "0010_listing_interaction_integrity.sql");
 const applyPath = join(process.cwd(), "supabase", "apply-listing-interactions.sql");
 const apiRoutePath = join(process.cwd(), "src", "app", "api", "listing-interactions", "route.ts");
+const interactionSessionPath = join(process.cwd(), "src", "lib", "listing-interaction-session.ts");
 const serviceClientPath = join(process.cwd(), "src", "lib", "supabase", "service.ts");
 
 function readSql(path: string) {
@@ -85,5 +86,12 @@ describe("listing interaction integrity migration", () => {
 
     expect(serviceClient).toContain('import "server-only";');
     expect(serviceClient).toContain("SUPABASE_SERVICE_ROLE_KEY");
+  });
+
+  it("does not use the service role key as the interaction fingerprint secret", () => {
+    const interactionSession = readSql(interactionSessionPath);
+
+    expect(interactionSession).toContain("process.env.INTERACTION_FINGERPRINT_SECRET");
+    expect(interactionSession).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
   });
 });

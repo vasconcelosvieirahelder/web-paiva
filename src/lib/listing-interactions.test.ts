@@ -1,12 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   getInteractionDayUTC,
   getListingActiveDays,
   summarizeListingInteractions,
 } from "./listing-interactions";
-import { buildInteractionIdentity, getTrustedInfrastructureIp, hashVisitorSessionId } from "./listing-interaction-session";
+import {
+  buildInteractionIdentity,
+  getInteractionFingerprintSecret,
+  getTrustedInfrastructureIp,
+  hashVisitorSessionId,
+} from "./listing-interaction-session";
+
+const originalInteractionSecret = process.env.INTERACTION_FINGERPRINT_SECRET;
+const originalServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 describe("listing interactions", () => {
+  afterEach(() => {
+    process.env.INTERACTION_FINGERPRINT_SECRET = originalInteractionSecret;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceRoleKey;
+  });
+
   it("summarizes views, contact clicks, and WhatsApp clicks", () => {
     expect(
       summarizeListingInteractions([
@@ -140,6 +153,108 @@ describe("listing interactions", () => {
     });
 
     expect(identityA).toBe(identityB);
+  });
+
+  it("keeps the same trusted IP identity when user-agent changes", () => {
+    const identityA = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      secret: "server-only-secret",
+      trustedIp: "203.0.113.10",
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: "session-a",
+    });
+    const identityB = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      secret: "server-only-secret",
+      trustedIp: "203.0.113.10",
+      userAgent: "CustomBot/1.0",
+      visitorSessionId: "session-a",
+    });
+
+    expect(identityA).toBe(identityB);
+  });
+
+  it("keeps the same trusted IP identity when accept-language changes", () => {
+    const identityA = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      secret: "server-only-secret",
+      trustedIp: "203.0.113.10",
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: "session-a",
+    });
+    const identityB = buildInteractionIdentity({
+      acceptLanguage: "ru",
+      secret: "server-only-secret",
+      trustedIp: "203.0.113.10",
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: "session-a",
+    });
+
+    expect(identityA).toBe(identityB);
+  });
+
+  it("keeps the same cookie identity when user-agent changes without trusted IP", () => {
+    const identityA = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      secret: "server-only-secret",
+      trustedIp: null,
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: "session-a",
+    });
+    const identityB = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      secret: "server-only-secret",
+      trustedIp: null,
+      userAgent: "CustomBot/1.0",
+      visitorSessionId: "session-a",
+    });
+
+    expect(identityA).toBe(identityB);
+  });
+
+  it("keeps the same cookie identity when accept-language changes without trusted IP", () => {
+    const identityA = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      secret: "server-only-secret",
+      trustedIp: null,
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: "session-a",
+    });
+    const identityB = buildInteractionIdentity({
+      acceptLanguage: "zh-CN",
+      secret: "server-only-secret",
+      trustedIp: null,
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: "session-a",
+    });
+
+    expect(identityA).toBe(identityB);
+  });
+
+  it("uses different identities for different trusted IPs", () => {
+    const identityA = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      secret: "server-only-secret",
+      trustedIp: "203.0.113.10",
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: "session-a",
+    });
+    const identityB = buildInteractionIdentity({
+      acceptLanguage: "pt-BR",
+      secret: "server-only-secret",
+      trustedIp: "203.0.113.20",
+      userAgent: "Mozilla/5.0",
+      visitorSessionId: "session-a",
+    });
+
+    expect(identityA).not.toBe(identityB);
+  });
+
+  it("requires a dedicated interaction fingerprint secret", () => {
+    process.env.INTERACTION_FINGERPRINT_SECRET = "";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key-must-not-be-used";
+
+    expect(() => getInteractionFingerprintSecret()).toThrow("Interaction fingerprint secret is not configured.");
   });
 
   it("does not trust generic forwarded headers for the interaction identity", () => {

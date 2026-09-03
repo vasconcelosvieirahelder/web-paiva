@@ -1,5 +1,4 @@
 import { createHash, createHmac } from "node:crypto";
-import { env } from "./env";
 
 type InteractionIdentityInput = {
   acceptLanguage: string | null;
@@ -28,23 +27,19 @@ export function getTrustedInfrastructureIp(headers: Headers) {
 }
 
 export function buildInteractionIdentity({
-  acceptLanguage,
   secret,
   trustedIp,
-  userAgent,
   visitorSessionId,
 }: InteractionIdentityInput) {
-  const requestContext = ["ua", normalizeHeader(userAgent), "lang", normalizeHeader(acceptLanguage)].join(":");
   const identitySource = trustedIp
     ? `ip:${normalizeHeader(trustedIp)}`
     : `cookie:${visitorSessionId ? hashVisitorSessionId(visitorSessionId) : "none"}`;
-  const identityMaterial = `${identitySource}:${requestContext}`;
 
-  return createHmac("sha256", secret).update(identityMaterial).digest("hex");
+  return createHmac("sha256", secret).update(identitySource).digest("hex");
 }
 
 export function getInteractionFingerprintSecret() {
-  const secret = process.env.INTERACTION_FINGERPRINT_SECRET || env.SUPABASE_SERVICE_ROLE_KEY;
+  const secret = process.env.INTERACTION_FINGERPRINT_SECRET;
 
   if (!secret) {
     throw new Error("Interaction fingerprint secret is not configured.");
